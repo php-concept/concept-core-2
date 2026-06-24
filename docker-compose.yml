@@ -1,0 +1,7 @@
+services:
+  app:
+    build: .
+    container_name: concept_core_2
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - .:/var/www/html

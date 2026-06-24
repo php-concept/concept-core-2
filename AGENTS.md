@@ -7,6 +7,7 @@
 
 - **Active code**: `src/`
 - **Old reference (не видаляти поки мігруємо)**: `storage/src/`
+- **Old configs (reference, не підключені)**: `storage/config/`
 - **Namespace**: `Concept\Core\`
 - **PHP**: 8.4, PHPStan level 9
 
@@ -30,9 +31,26 @@ Skeleton підключає цей проєкт через symlink:
 
 - FormRequest / Validation
 - Caster / Valinor
-- Session, View, Database, Config, Telemetry, Console, …
+- Session, View, Database, Telemetry, Console, …
+- **Config** — extension на фінальному етапі (зараз **без ConfigInterface**)
 
-Див. `storage/src/` як reference для міграції.
+Див. `storage/src/` та `storage/config/` як reference для міграції.
+
+## Конфігурація — без ConfigInterface
+
+Під час міграції **ядро не використовує ConfigInterface**. Усі налаштування передаються skeleton-ом явно (масиви, параметри конструкторів providers).
+
+`storage/config/` — PHP-файли старого додатку (`app.php`, `db.php`, `routes.php`, …). Reference only; не autoload, не bootstrap.
+
+Config extension (пізніше) читатиме конфіги і прокидатиме значення в glue — ядро лишається без Config.
+
+## Enriched request — без container refresh
+
+`RouteStrategy::prepareRequest()` додає route vars у PSR-7 attributes і повертає enriched request для resolvers/handler.
+
+**Не робить** `container->add(ServerRequestInterface, …)`. Container request (globals) — тільки entry point у `App::handle()`.
+
+Extensions отримують request явно (resolver args, method params). `RequestProxy` — не в core; у Http extension лише за потреби.
 
 ## Argument resolvers — core (implemented)
 

@@ -5,7 +5,6 @@ namespace Concept\Core\Http\Routing;
 use Closure;
 use Concept\Core\Http\Contracts\ArgumentResolverInterface;
 use Concept\Core\Http\Contracts\RouteInterceptorInterface;
-use League\Container\DefinitionContainerInterface;
 use League\Route\Route;
 use League\Route\Strategy\ApplicationStrategy;
 use Psr\Container\ContainerInterface;
@@ -73,23 +72,14 @@ class RouteStrategy extends ApplicationStrategy
     }
 
     /**
-     * Prepares the request with the route variables
-     *
-     * @param Route $route
-     * @param ServerRequestInterface $request
-     * @return ServerRequestInterface
+     * Enriches the request with route variables as PSR-7 attributes.
+     * The enriched instance is passed to argument resolvers only — not stored in the container.
      */
     private function prepareRequest(Route $route, ServerRequestInterface $request): ServerRequestInterface
     {
-        // Add route variables to the request
         foreach ($route->getVars() as $name => $value) {
             $request = $request->withAttribute($name, $value);
         }
-
-        // Refresh the request in the container
-        /** @var DefinitionContainerInterface $container */
-        $container = $this->getContainer();
-        $container->add(ServerRequestInterface::class, $request, true);
 
         return $request;
     }

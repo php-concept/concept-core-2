@@ -16,9 +16,11 @@ use ReflectionFunction;
 use ReflectionFunctionAbstract;
 use ReflectionMethod;
 use ReflectionParameter;
+use RuntimeException;
 
 class RouteStrategy extends ApplicationStrategy
 {
+    private const string ERR_HANDLER_MUST_RETURN_RESPONSE = 'Route handler must return an instance of %s.';
     /**
      * @param array<ArgumentResolverInterface> $resolvers
      * @param array<class-string<RouteInterceptorInterface>> $interceptors
@@ -36,22 +38,24 @@ class RouteStrategy extends ApplicationStrategy
         $callable = $route->getCallable($this->getContainer());
         try {
             $reflection = $this->getReflection($callable);
-            $arguments = $this->resolveArguments($reflection, $request, $route->getVars());
+            /** @var array<string, mixed> $vars */
+            $vars = $route->getVars();
+            $arguments = $this->resolveArguments($reflection, $request, $vars);
 
             if (is_array($callable)) {
                 /** @var object $object */
                 $object = $callable[0];
                 /** @phpstan-ignore method.notFound */
-                return $reflection->invokeArgs($object, $arguments);
+                return $this->assertResponse($reflection->invokeArgs($object, $arguments));
             }
 
             if (is_object($callable) && !($callable instanceof Closure)) {
                 /** @phpstan-ignore method.notFound */
-                return $reflection->invokeArgs($callable, $arguments);
+                return $this->assertResponse($reflection->invokeArgs($callable, $arguments));
             }
 
             /** @phpstan-ignore-next-line */
-            return $reflection->invokeArgs($arguments);
+            return $this->assertResponse($reflection->invokeArgs($arguments));
         } finally {
             // TODO: add event
         }
@@ -116,7 +120,7 @@ class RouteStrategy extends ApplicationStrategy
      *
      * @param ReflectionFunctionAbstract $reflection
      * @param ServerRequestInterface $request
-     * @param array<string> $vars
+     * @param array<string, mixed> $vars
      * @return array<mixed>
      */
     private function resolveArguments(
@@ -137,7 +141,7 @@ class RouteStrategy extends ApplicationStrategy
      *
      * @param ReflectionParameter $parameter
      * @param ServerRequestInterface $request
-     * @param array<string> $vars
+     * @param array<string, mixed> $vars
      * @return mixed
      */
     private function resolveParameter(
@@ -146,7 +150,7 @@ class RouteStrategy extends ApplicationStrategy
         array $vars): mixed
     {
         foreach ($this->resolvers as $resolver) {
-            if ($resolver->supports($parameter)) {
+            if ($resolver->supports($parameter, $vars)) {
                 return $resolver->resolve($parameter, $request, $vars);
             }
         }
@@ -156,5 +160,14 @@ class RouteStrategy extends ApplicationStrategy
         }
 
         return null;
+    }
+
+    private function assertResponse(mixed $result): ResponseInterface
+    {
+        if ($result instanceof ResponseInterface) {
+            return $result;
+        }
+
+        throw new RuntimeException(sprintf(self::ERR_HANDLER_MUST_RETURN_RESPONSE, ResponseInterface::class));
     }
 }

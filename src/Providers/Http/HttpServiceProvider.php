@@ -4,6 +4,8 @@ namespace Concept\Core\Providers\Http;
 
 use Concept\Core\Http\Contracts\ArgumentResolverInterface;
 use Concept\Core\Http\Contracts\RouteInterceptorInterface;
+use Concept\Core\Http\Routing\Resolvers\RouteParameterArgumentResolver;
+use Concept\Core\Http\Routing\Resolvers\ServerRequestArgumentResolver;
 use Concept\Core\Http\Routing\RouteStrategy;
 use InvalidArgumentException;
 use Laminas\Diactoros\ServerRequestFactory;
@@ -47,7 +49,7 @@ class HttpServiceProvider extends AbstractServiceProvider
         $container->add(Router::class, function () use ($container) {
             $router = new Router();
 
-            $strategy = new RouteStrategy($this->resolvers, $this->interceptors);
+            $strategy = new RouteStrategy($this->resolveResolvers(), $this->interceptors);
             $strategy->setContainer($container);
             $router->setStrategy($strategy);
             $this->registerRoutes($router, $this->routePaths);
@@ -74,5 +76,17 @@ class HttpServiceProvider extends AbstractServiceProvider
 
             $loader($router, $routesFileName);
         }
+    }
+
+    /**
+     * @return array<ArgumentResolverInterface>
+     */
+    private function resolveResolvers(): array
+    {
+        return [
+            ...$this->resolvers,
+            new ServerRequestArgumentResolver(),
+            new RouteParameterArgumentResolver(),
+        ];
     }
 }

@@ -4,6 +4,7 @@ namespace Concept\Core\Http\Routing;
 
 use Closure;
 use Concept\Core\Http\Contracts\ArgumentResolverInterface;
+use Concept\Core\Http\Contracts\RequestContextInterface;
 use Concept\Core\Http\Contracts\RouteInterceptorInterface;
 use League\Route\Route;
 use League\Route\Strategy\ApplicationStrategy;
@@ -34,6 +35,9 @@ class RouteStrategy extends ApplicationStrategy
         $this->runInterceptors($route, $request);
 
         $request = $this->prepareRequest($route, $request);
+        $requestContext = $this->resolveRequestContext();
+        $requestContext?->set($request);
+
         $callable = $route->getCallable($this->getContainer());
         try {
             $reflection = $this->getReflection($callable);
@@ -56,8 +60,21 @@ class RouteStrategy extends ApplicationStrategy
             /** @phpstan-ignore-next-line */
             return $this->assertResponse($reflection->invokeArgs($arguments));
         } finally {
-            // TODO: add event
+            $requestContext?->reset();
         }
+    }
+
+    private function resolveRequestContext(): ?RequestContextInterface
+    {
+        /** @var ContainerInterface $container */
+        $container = $this->getContainer();
+        if (!$container->has(RequestContextInterface::class)) {
+            return null;
+        }
+
+        $requestContext = $container->get(RequestContextInterface::class);
+
+        return $requestContext instanceof RequestContextInterface ? $requestContext : null;
     }
 
     private function runInterceptors(Route $route, ServerRequestInterface $request): void

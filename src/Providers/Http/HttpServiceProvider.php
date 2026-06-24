@@ -3,9 +3,9 @@
 namespace Concept\Core\Providers\Http;
 
 use Concept\Core\Http\Contracts\ArgumentResolverInterface;
+use Concept\Core\Http\Contracts\RequestContextInterface;
 use Concept\Core\Http\Contracts\RouteInterceptorInterface;
-use Concept\Core\Http\Routing\Resolvers\RouteParameterArgumentResolver;
-use Concept\Core\Http\Routing\Resolvers\ServerRequestArgumentResolver;
+use Concept\Core\Http\Request\RequestContext;
 use Concept\Core\Http\Routing\RouteStrategy;
 use InvalidArgumentException;
 use Laminas\Diactoros\ServerRequestFactory;
@@ -19,7 +19,7 @@ class HttpServiceProvider extends AbstractServiceProvider
 
     /**
      * @param array<string> $routePaths
-     * @param array<ArgumentResolverInterface> $resolvers
+     * @param array<ArgumentResolverInterface> $resolvers Ordered argument resolver chain
      * @param array<class-string<RouteInterceptorInterface>> $interceptors
      */
     public function __construct(
@@ -32,6 +32,7 @@ class HttpServiceProvider extends AbstractServiceProvider
     {
         $services = [
             ServerRequestInterface::class,
+            RequestContextInterface::class,
             Router::class,
         ];
 
@@ -46,10 +47,12 @@ class HttpServiceProvider extends AbstractServiceProvider
             return ServerRequestFactory::fromGlobals($_SERVER, $_GET, $_POST, $_COOKIE, $_FILES);
         })->setShared(true);
 
+        $container->add(RequestContextInterface::class, fn () => new RequestContext())->setShared(true);
+
         $container->add(Router::class, function () use ($container) {
             $router = new Router();
 
-            $strategy = new RouteStrategy($this->resolveResolvers(), $this->interceptors);
+            $strategy = new RouteStrategy($this->resolvers, $this->interceptors);
             $strategy->setContainer($container);
             $router->setStrategy($strategy);
             $this->registerRoutes($router, $this->routePaths);
@@ -76,17 +79,5 @@ class HttpServiceProvider extends AbstractServiceProvider
 
             $loader($router, $routesFileName);
         }
-    }
-
-    /**
-     * @return array<ArgumentResolverInterface>
-     */
-    private function resolveResolvers(): array
-    {
-        return [
-            ...$this->resolvers,
-            new ServerRequestArgumentResolver(),
-            new RouteParameterArgumentResolver(),
-        ];
     }
 }

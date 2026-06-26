@@ -3,10 +3,13 @@
 namespace Concept\Core\Http\Routing;
 
 use Closure;
+use Concept\Core\Events\Http\RouteHandlerInvoked;
+use Concept\Core\Events\Http\RouteInterceptorInvoked;
 use Concept\Core\Http\Contracts\ArgumentResolverInterface;
 use Concept\Core\Http\Contracts\RequestContextInterface;
 use Concept\Core\Http\Contracts\RouteInterceptorInterface;
 use League\Route\Route;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use League\Route\Strategy\ApplicationStrategy;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -28,6 +31,7 @@ class RouteStrategy extends ApplicationStrategy
     public function __construct(
         private readonly array $resolvers = [],
         private readonly array $interceptors = [],
+        private readonly ?EventDispatcherInterface $dispatcher = null,
     ) {}
 
     public function invokeRouteCallable(Route $route, ServerRequestInterface $request): ResponseInterface
@@ -39,6 +43,7 @@ class RouteStrategy extends ApplicationStrategy
         $requestContext?->set($request);
 
         $callable = $route->getCallable($this->getContainer());
+        $startedAt = microtime(true);
         try {
             $reflection = $this->getReflection($callable);
             /** @var array<string, mixed> $vars */
@@ -60,6 +65,7 @@ class RouteStrategy extends ApplicationStrategy
             /** @phpstan-ignore-next-line */
             return $this->assertResponse($reflection->invokeArgs($arguments));
         } finally {
+            $this->dispatchRouteHandlerInvoked($callable, $route, $startedAt);
             $requestContext?->reset();
         }
     }
@@ -85,6 +91,7 @@ class RouteStrategy extends ApplicationStrategy
             /** @var RouteInterceptorInterface $interceptor */
             $interceptor = $container->get($interceptorClass);
             $interceptor->intercept($route, $request);
+            $this->dispatcher?->dispatch(new RouteInterceptorInvoked($interceptorClass, $route));
         }
     }
 
@@ -176,5 +183,40 @@ class RouteStrategy extends ApplicationStrategy
         }
 
         throw new RuntimeException(sprintf(self::ERR_HANDLER_MUST_RETURN_RESPONSE, ResponseInterface::class));
+    }
+
+    private function dispatchRouteHandlerInvoked(callable $callable, Route $route, float $startedAt): void
+    {
+        $duration = microtime(true) - $startedAt;
+        $this->dispatcher?->dispatch(new RouteHandlerInvoked(
+            handler: $this->describeCallable($callable),
+            route: $route,
+            startedAt: $startedAt,
+            duration: $duration,
+        ));
+    }
+
+    private function describeCallable(callable $callable): string
+    {
+        if ($callable instanceof Closure) {
+            return 'closure';
+        }
+
+        if (is_string($callable)) {
+            return $callable;
+        }
+
+        if (is_array($callable)) {
+            $target = $callable[0];
+            $method = $callable[1];
+
+            return (is_object($target) ? $target::class : (string) $target) . '::' . (string) $method;
+        }
+
+        if (is_object($callable)) {
+            return $callable::class . '::__invoke';
+        }
+
+        return 'callable';
     }
 }

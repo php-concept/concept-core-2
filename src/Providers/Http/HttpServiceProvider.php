@@ -11,6 +11,7 @@ use InvalidArgumentException;
 use Laminas\Diactoros\ServerRequestFactory;
 use League\Container\ServiceProvider\AbstractServiceProvider;
 use League\Route\Router;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
 class HttpServiceProvider extends AbstractServiceProvider
@@ -25,7 +26,8 @@ class HttpServiceProvider extends AbstractServiceProvider
     public function __construct(
         private readonly array $routePaths,
         private readonly array $resolvers = [],
-        private readonly array $interceptors = []
+        private readonly array $interceptors = [],
+        private readonly ?EventDispatcherInterface $dispatcher = null,
     ) {}
 
     public function provides(string $id): bool
@@ -52,7 +54,7 @@ class HttpServiceProvider extends AbstractServiceProvider
         $container->add(Router::class, function () use ($container) {
             $router = new Router();
 
-            $strategy = new RouteStrategy($this->resolvers, $this->interceptors);
+            $strategy = new RouteStrategy($this->resolvers, $this->interceptors, $this->dispatcher);
             $strategy->setContainer($container);
             $router->setStrategy($strategy);
             $this->registerRoutes($router, $this->routePaths);

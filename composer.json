@@ -26,7 +26,8 @@
         "league/route": "^6.2",
         "league/container": "^5.1",
         "laminas/laminas-diactoros": "^3.8",
-        "laminas/laminas-httphandlerrunner": "^2.13"
+        "laminas/laminas-httphandlerrunner": "^2.13",
+        "psr/event-dispatcher": "^1.0"
     },
     "scripts": {
         "phpstan": "vendor/bin/phpstan analyze --memory-limit=2G"

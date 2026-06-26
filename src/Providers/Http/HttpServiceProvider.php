@@ -27,7 +27,6 @@ class HttpServiceProvider extends AbstractServiceProvider
         private readonly array $routePaths,
         private readonly array $resolvers = [],
         private readonly array $interceptors = [],
-        private readonly ?EventDispatcherInterface $dispatcher = null,
     ) {}
 
     public function provides(string $id): bool
@@ -54,7 +53,15 @@ class HttpServiceProvider extends AbstractServiceProvider
         $container->add(Router::class, function () use ($container) {
             $router = new Router();
 
-            $strategy = new RouteStrategy($this->resolvers, $this->interceptors, $this->dispatcher);
+            $dispatcher = $container->has(EventDispatcherInterface::class)
+                ? $container->get(EventDispatcherInterface::class)
+                : null;
+
+            $strategy = new RouteStrategy(
+                $this->resolvers,
+                $this->interceptors,
+                $dispatcher instanceof EventDispatcherInterface ? $dispatcher : null,
+            );
             $strategy->setContainer($container);
             $router->setStrategy($strategy);
             $this->registerRoutes($router, $this->routePaths);

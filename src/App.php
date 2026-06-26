@@ -2,12 +2,14 @@
 
 namespace Concept\Core;
 
-use http\Exception\InvalidArgumentException;
+use Concept\Core\Events\Http\RequestHandled;
+use InvalidArgumentException;
 use League\Container\Container;
 use League\Container\ReflectionContainer;
 use League\Container\ServiceProvider\ServiceProviderInterface;
 use League\Route\Router;
 use Psr\Container\ContainerInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use RuntimeException;
@@ -66,6 +68,27 @@ final class App
         /** @var ServerRequestInterface $request */
         $request = $this->container->get(ServerRequestInterface::class);
 
-        return $router->dispatch($request);
+        $dispatcher = $this->container->has(EventDispatcherInterface::class)
+            ? $this->container->get(EventDispatcherInterface::class)
+            : null;
+
+        $startedAt = microtime(true);
+        $memoryStart = memory_get_usage(true);
+
+        try {
+            return $router->dispatch($request);
+        } finally {
+            if ($dispatcher instanceof EventDispatcherInterface) {
+                $dispatcher->dispatch(new RequestHandled(
+                    method: $request->getMethod(),
+                    path: $request->getUri()->getPath(),
+                    memoryStart: $memoryStart,
+                    memoryEnd: memory_get_usage(true),
+                    memoryPeak: memory_get_peak_usage(true),
+                    startedAt: $startedAt,
+                    duration: microtime(true) - $startedAt,
+                ));
+            }
+        }
     }
 }

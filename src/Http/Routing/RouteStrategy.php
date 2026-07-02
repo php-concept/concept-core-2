@@ -8,12 +8,14 @@ use Concept\Core\Events\Http\RouteInterceptorInvoked;
 use Concept\Core\Http\Contracts\ArgumentResolverInterface;
 use Concept\Core\Http\Contracts\RequestContextInterface;
 use Concept\Core\Http\Contracts\RouteInterceptorInterface;
+use League\Route\Http\Exception\NotFoundException;
 use League\Route\Route;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use League\Route\Strategy\ApplicationStrategy;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\MiddlewareInterface;
 use ReflectionException;
 use ReflectionFunction;
 use ReflectionFunctionAbstract;
@@ -24,15 +26,76 @@ use RuntimeException;
 class RouteStrategy extends ApplicationStrategy
 {
     private const string ERR_HANDLER_MUST_RETURN_RESPONSE = 'Route handler must return an instance of %s.';
+    private const string ERR_NOT_FOUND_MIDDLEWARE_CONTAINER = 'Container is required to resolve not-found middleware.';
+    private const string ERR_NOT_FOUND_MIDDLEWARE_INVALID = 'Not-found middleware must resolve to an instance of %s, got %s.';
+
+    private ?MiddlewareInterface $resolvedNotFoundMiddleware = null;
+
     /**
      * @param array<ArgumentResolverInterface> $resolvers
      * @param array<class-string<RouteInterceptorInterface>> $interceptors
+     * @param MiddlewareInterface|class-string<MiddlewareInterface>|Closure(ContainerInterface): MiddlewareInterface|null $notFoundMiddleware
      */
     public function __construct(
         private readonly array $resolvers = [],
         private readonly array $interceptors = [],
         private readonly ?EventDispatcherInterface $dispatcher = null,
+        private readonly MiddlewareInterface|Closure|string|null $notFoundMiddleware = null,
     ) {}
+
+    public function getNotFoundDecorator(NotFoundException $exception): MiddlewareInterface
+    {
+        if ($this->resolvedNotFoundMiddleware instanceof MiddlewareInterface) {
+            return $this->resolvedNotFoundMiddleware;
+        }
+
+        if ($this->notFoundMiddleware instanceof MiddlewareInterface) {
+            $this->resolvedNotFoundMiddleware = $this->notFoundMiddleware;
+
+            return $this->resolvedNotFoundMiddleware;
+        }
+
+        if (is_string($this->notFoundMiddleware)) {
+            $this->resolvedNotFoundMiddleware = $this->resolveNotFoundMiddlewareFromContainer($this->notFoundMiddleware);
+
+            return $this->resolvedNotFoundMiddleware;
+        }
+
+        if ($this->notFoundMiddleware instanceof Closure) {
+            $container = $this->getContainer();
+            if (!$container instanceof ContainerInterface) {
+                throw new RuntimeException(self::ERR_NOT_FOUND_MIDDLEWARE_CONTAINER);
+            }
+
+            $this->resolvedNotFoundMiddleware = ($this->notFoundMiddleware)($container);
+
+            return $this->resolvedNotFoundMiddleware;
+        }
+
+        return parent::getNotFoundDecorator($exception);
+    }
+
+    /**
+     * @param class-string<MiddlewareInterface> $middlewareClass
+     */
+    private function resolveNotFoundMiddlewareFromContainer(string $middlewareClass): MiddlewareInterface
+    {
+        $container = $this->getContainer();
+        if (!$container instanceof ContainerInterface) {
+            throw new RuntimeException(self::ERR_NOT_FOUND_MIDDLEWARE_CONTAINER);
+        }
+
+        $middleware = $container->get($middlewareClass);
+        if (!$middleware instanceof MiddlewareInterface) {
+            throw new RuntimeException(sprintf(
+                self::ERR_NOT_FOUND_MIDDLEWARE_INVALID,
+                MiddlewareInterface::class,
+                is_object($middleware) ? $middleware::class : get_debug_type($middleware),
+            ));
+        }
+
+        return $middleware;
+    }
 
     public function invokeRouteCallable(Route $route, ServerRequestInterface $request): ResponseInterface
     {

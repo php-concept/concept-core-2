@@ -7,12 +7,15 @@ use Concept\Core\Http\Contracts\RequestContextInterface;
 use Concept\Core\Http\Contracts\RouteInterceptorInterface;
 use Concept\Core\Http\Request\RequestContext;
 use Concept\Core\Http\Routing\RouteStrategy;
+use Closure;
 use InvalidArgumentException;
 use Laminas\Diactoros\ServerRequestFactory;
 use League\Container\ServiceProvider\AbstractServiceProvider;
 use League\Route\Router;
+use Psr\Container\ContainerInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\MiddlewareInterface;
 
 class HttpKernelServiceProvider extends AbstractServiceProvider
 {
@@ -22,11 +25,13 @@ class HttpKernelServiceProvider extends AbstractServiceProvider
      * @param array<string> $routePaths
      * @param array<ArgumentResolverInterface> $resolvers Ordered argument resolver chain
      * @param array<class-string<RouteInterceptorInterface>> $interceptors
+     * @param MiddlewareInterface|class-string<MiddlewareInterface>|Closure(ContainerInterface): MiddlewareInterface|null $notFoundMiddleware
      */
     public function __construct(
         private readonly array $routePaths,
         private readonly array $resolvers = [],
         private readonly array $interceptors = [],
+        private readonly MiddlewareInterface|Closure|string|null $notFoundMiddleware = null,
     ) {}
 
     public function provides(string $id): bool
@@ -61,6 +66,7 @@ class HttpKernelServiceProvider extends AbstractServiceProvider
                 $this->resolvers,
                 $this->interceptors,
                 $dispatcher instanceof EventDispatcherInterface ? $dispatcher : null,
+                $this->notFoundMiddleware,
             );
             $strategy->setContainer($container);
             $router->setStrategy($strategy);

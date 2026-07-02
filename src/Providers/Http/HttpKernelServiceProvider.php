@@ -14,7 +14,7 @@ use League\Route\Router;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
-class HttpServiceProvider extends AbstractServiceProvider
+class HttpKernelServiceProvider extends AbstractServiceProvider
 {
     private const string ERR_ROUTES_NOT_FOUND = 'Routes file not found at: %s';
 
@@ -44,13 +44,13 @@ class HttpServiceProvider extends AbstractServiceProvider
     {
         $container = $this->getContainer();
 
-        $container->add(ServerRequestInterface::class, function () {
+        $container->add(ServerRequestInterface::class, function() {
             return ServerRequestFactory::fromGlobals($_SERVER, $_GET, $_POST, $_COOKIE, $_FILES);
         })->setShared(true);
 
-        $container->add(RequestContextInterface::class, fn () => new RequestContext())->setShared(true);
+        $container->add(RequestContextInterface::class, fn() => new RequestContext())->setShared(true);
 
-        $container->add(Router::class, function () use ($container) {
+        $container->add(Router::class, function() use ($container) {
             $router = new Router();
 
             $dispatcher = $container->has(EventDispatcherInterface::class)
@@ -73,11 +73,10 @@ class HttpServiceProvider extends AbstractServiceProvider
     /**
      * @param Router $router
      * @param array<string> $routePaths
-     * @return void
      */
     private function registerRoutes(Router $router, array $routePaths): void
     {
-        $loader = function (Router $router, string $filePath) {
+        $loader = function(Router $router, string $filePath) {
             require $filePath;
         };
 

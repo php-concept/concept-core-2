@@ -22,7 +22,7 @@ Skeleton підключає цей проєкт через symlink:
 | Компонент | Файл |
 |-----------|------|
 | Application | `src/App.php` |
-| HTTP provider | `src/Providers/Http/HttpServiceProvider.php` |
+| HTTP kernel provider | `src/Providers/Http/HttpKernelServiceProvider.php` |
 | Route strategy | `src/Http/Routing/RouteStrategy.php` |
 | Resolver contract | `src/Http/Contracts/ArgumentResolverInterface.php` |
 | Interceptor contract | `src/Http/Contracts/RouteInterceptorInterface.php` |
@@ -59,8 +59,7 @@ Extensions отримують request явно (resolver args, method params). `
 1. **ServerRequestArgumentResolver** — type hint `ServerRequestInterface`
 2. **RouteParameterArgumentResolver** — param name ∈ route `$vars`, raw value
 
-Registered by default in `HttpServiceProvider::resolveResolvers()`.
-Extension resolvers from constructor are prepended (higher priority).
+Registered by skeleton via `HttpKernelServiceProvider` constructor (`$resolvers` chain).
 
 ## Залежності (composer.json)
 

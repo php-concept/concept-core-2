@@ -56,10 +56,6 @@ final class App
                 throw new InvalidArgumentException(sprintf(self::ERR_IS_NOT_PROVIDER_INSTANCE, $key));
             }
 
-            if (!($provider instanceof ServiceProviderInterface)) {
-                throw new InvalidArgumentException(sprintf(self::ERR_IS_NOT_PROVIDER_INSTANCE, $key));
-            }
-
             $this->container->addServiceProvider($provider);
         }
     }

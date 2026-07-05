@@ -43,12 +43,19 @@ final class App
     }
 
     /**
-     * @param array<callable> $providers
+     * @param list<ServiceProviderInterface|callable(): ServiceProviderInterface> $providers
      */
     public function registerServiceProviders(array $providers): void
     {
-        foreach ($providers as $key => $callable) {
-            $provider = $callable($this->container);
+        foreach ($providers as $key => $entry) {
+            if ($entry instanceof ServiceProviderInterface) {
+                $provider = $entry;
+            } elseif (is_callable($entry)) {
+                $provider = $entry();
+            } else {
+                throw new InvalidArgumentException(sprintf(self::ERR_IS_NOT_PROVIDER_INSTANCE, $key));
+            }
+
             if (!($provider instanceof ServiceProviderInterface)) {
                 throw new InvalidArgumentException(sprintf(self::ERR_IS_NOT_PROVIDER_INSTANCE, $key));
             }

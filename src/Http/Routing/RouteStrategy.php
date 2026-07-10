@@ -26,21 +26,22 @@ use RuntimeException;
 class RouteStrategy extends ApplicationStrategy
 {
     private const string ERR_HANDLER_MUST_RETURN_RESPONSE = 'Route handler must return an instance of %s.';
-    private const string ERR_NOT_FOUND_MIDDLEWARE_CONTAINER = 'Container is required to resolve not-found middleware.';
-    private const string ERR_NOT_FOUND_MIDDLEWARE_INVALID = 'Not-found middleware must resolve to an instance of %s, got %s.';
+    private const string ERR_FACTORY_CONTAINER = 'Container is required to invoke route factories.';
+    private const string ERR_NOT_FOUND_MIDDLEWARE_INVALID = 'Not-found middleware factory must return an instance of %s, got %s.';
+    private const string ERR_INTERCEPTOR_INVALID = 'Route interceptor factory must return an instance of %s, got %s.';
 
     private ?MiddlewareInterface $resolvedNotFoundMiddleware = null;
 
     /**
      * @param array<ArgumentResolverInterface> $resolvers
-     * @param array<class-string<RouteInterceptorInterface>> $interceptors
-     * @param MiddlewareInterface|class-string<MiddlewareInterface>|Closure(ContainerInterface): MiddlewareInterface|null $notFoundMiddleware
+     * @param array<RouteInterceptorInterface|Closure(ContainerInterface): mixed> $interceptors
+     * @param MiddlewareInterface|Closure(ContainerInterface): mixed|null $notFoundMiddleware
      */
     public function __construct(
         private readonly array $resolvers = [],
         private readonly array $interceptors = [],
         private readonly ?EventDispatcherInterface $dispatcher = null,
-        private readonly MiddlewareInterface|Closure|string|null $notFoundMiddleware = null,
+        private readonly MiddlewareInterface|Closure|null $notFoundMiddleware = null,
     ) {}
 
     public function getNotFoundDecorator(NotFoundException $exception): MiddlewareInterface
@@ -55,46 +56,28 @@ class RouteStrategy extends ApplicationStrategy
             return $this->resolvedNotFoundMiddleware;
         }
 
-        if (is_string($this->notFoundMiddleware)) {
-            $this->resolvedNotFoundMiddleware = $this->resolveNotFoundMiddlewareFromContainer($this->notFoundMiddleware);
-
-            return $this->resolvedNotFoundMiddleware;
-        }
-
         if ($this->notFoundMiddleware instanceof Closure) {
             $container = $this->getContainer();
             if (!$container instanceof ContainerInterface) {
-                throw new RuntimeException(self::ERR_NOT_FOUND_MIDDLEWARE_CONTAINER);
+                throw new RuntimeException(self::ERR_FACTORY_CONTAINER);
             }
 
-            $this->resolvedNotFoundMiddleware = ($this->notFoundMiddleware)($container);
+            $middleware = ($this->notFoundMiddleware)($container);
+
+            if (!$middleware instanceof MiddlewareInterface) {
+                throw new RuntimeException(sprintf(
+                    self::ERR_NOT_FOUND_MIDDLEWARE_INVALID,
+                    MiddlewareInterface::class,
+                    is_object($middleware) ? $middleware::class : get_debug_type($middleware),
+                ));
+            }
+
+            $this->resolvedNotFoundMiddleware = $middleware;
 
             return $this->resolvedNotFoundMiddleware;
         }
 
         return parent::getNotFoundDecorator($exception);
-    }
-
-    /**
-     * @param class-string<MiddlewareInterface> $middlewareClass
-     */
-    private function resolveNotFoundMiddlewareFromContainer(string $middlewareClass): MiddlewareInterface
-    {
-        $container = $this->getContainer();
-        if (!$container instanceof ContainerInterface) {
-            throw new RuntimeException(self::ERR_NOT_FOUND_MIDDLEWARE_CONTAINER);
-        }
-
-        $middleware = $container->get($middlewareClass);
-        if (!$middleware instanceof MiddlewareInterface) {
-            throw new RuntimeException(sprintf(
-                self::ERR_NOT_FOUND_MIDDLEWARE_INVALID,
-                MiddlewareInterface::class,
-                is_object($middleware) ? $middleware::class : get_debug_type($middleware),
-            ));
-        }
-
-        return $middleware;
     }
 
     public function invokeRouteCallable(Route $route, ServerRequestInterface $request): ResponseInterface
@@ -148,13 +131,26 @@ class RouteStrategy extends ApplicationStrategy
 
     private function runInterceptors(Route $route, ServerRequestInterface $request): void
     {
-        /** @var ContainerInterface $container */
         $container = $this->getContainer();
-        foreach ($this->interceptors as $interceptorClass) {
-            /** @var RouteInterceptorInterface $interceptor */
-            $interceptor = $container->get($interceptorClass);
+        if (!$container instanceof ContainerInterface) {
+            throw new RuntimeException(self::ERR_FACTORY_CONTAINER);
+        }
+
+        foreach ($this->interceptors as $interceptorEntry) {
+            $interceptor = $interceptorEntry instanceof Closure
+                ? $interceptorEntry($container)
+                : $interceptorEntry;
+
+            if (!$interceptor instanceof RouteInterceptorInterface) {
+                throw new RuntimeException(sprintf(
+                    self::ERR_INTERCEPTOR_INVALID,
+                    RouteInterceptorInterface::class,
+                    is_object($interceptor) ? $interceptor::class : get_debug_type($interceptor),
+                ));
+            }
+
             $interceptor->intercept($route, $request);
-            $this->dispatcher?->dispatch(new RouteInterceptorInvoked($interceptorClass, $route));
+            $this->dispatcher?->dispatch(new RouteInterceptorInvoked($interceptor::class, $route));
         }
     }
 

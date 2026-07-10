@@ -24,14 +24,14 @@ class HttpKernelServiceProvider extends AbstractServiceProvider
     /**
      * @param array<string> $routePaths
      * @param array<ArgumentResolverInterface> $resolvers Ordered argument resolver chain
-     * @param array<class-string<RouteInterceptorInterface>> $interceptors
-     * @param MiddlewareInterface|class-string<MiddlewareInterface>|Closure(ContainerInterface): MiddlewareInterface|null $notFoundMiddleware
+     * @param array<RouteInterceptorInterface|Closure(ContainerInterface): mixed> $interceptors
+     * @param MiddlewareInterface|Closure(ContainerInterface): mixed|null $notFoundMiddleware
      */
     public function __construct(
         private readonly array $routePaths,
         private readonly array $resolvers = [],
         private readonly array $interceptors = [],
-        private readonly MiddlewareInterface|Closure|string|null $notFoundMiddleware = null,
+        private readonly MiddlewareInterface|Closure|null $notFoundMiddleware = null,
     ) {}
 
     public function provides(string $id): bool

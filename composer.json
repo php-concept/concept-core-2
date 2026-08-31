@@ -19,7 +19,8 @@
         }
     },
     "require-dev": {
-        "phpstan/phpstan": "^2.1"
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^11"
     },
     "require": {
         "php": "^8.4",
@@ -30,6 +31,7 @@
         "psr/event-dispatcher": "^1.0"
     },
     "scripts": {
-        "phpstan": "vendor/bin/phpstan analyze --memory-limit=2G"
+        "phpstan": "vendor/bin/phpstan analyze --memory-limit=2G",
+        "test": "vendor/bin/phpunit"
     }
 }

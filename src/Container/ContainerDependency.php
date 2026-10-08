@@ -30,4 +30,29 @@ final class ContainerDependency
         /** @var T $resolved */
         return $resolved;
     }
+
+    /**
+     * Optional resolve: missing registration → null.
+     * Wrong type still throws (does not hide broken bindings).
+     *
+     * @template T of object
+     * @param class-string<T> $interface
+     * @return T|null
+     */
+    public static function getOrNull(ContainerInterface $container, string $interface): ?object
+    {
+        if (!$container->has($interface)) {
+            return null;
+        }
+
+        try {
+            return self::get($container, $interface);
+        } catch (ContainerDependencyException $exception) {
+            if ($exception->isNotRegistered()) {
+                return null;
+            }
+
+            throw $exception;
+        }
+    }
 }

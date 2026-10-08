@@ -10,15 +10,24 @@ final class ContainerDependencyException extends RuntimeException
     private const string ERR_NOT_REGISTERED = 'Container service (%s) is not registered.';
     private const string ERR_UNEXPECTED_TYPE = 'Container service (%s) must be an instance of %s, %s given.';
 
+    private const int CODE_NOT_REGISTERED = 1;
+
+    private const int CODE_UNEXPECTED_TYPE = 2;
+
     public static function notRegistered(string $interface, ?Throwable $previous = null): self
     {
-        return new self(sprintf(self::ERR_NOT_REGISTERED, $interface), 0, $previous);
+        return new self(sprintf(self::ERR_NOT_REGISTERED, $interface), self::CODE_NOT_REGISTERED, $previous);
     }
 
     public static function unexpectedType(string $interface, string $expected, mixed $resolved): self
     {
         $actual = is_object($resolved) ? $resolved::class : get_debug_type($resolved);
 
-        return new self(sprintf(self::ERR_UNEXPECTED_TYPE, $interface, $expected, $actual));
+        return new self(sprintf(self::ERR_UNEXPECTED_TYPE, $interface, $expected, $actual), self::CODE_UNEXPECTED_TYPE);
+    }
+
+    public function isNotRegistered(): bool
+    {
+        return $this->getCode() === self::CODE_NOT_REGISTERED;
     }
 }

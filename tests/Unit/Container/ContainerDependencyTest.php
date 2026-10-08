@@ -75,6 +75,82 @@ final class ContainerDependencyTest extends TestCase
 
         ContainerDependency::get($container, FooInterface::class);
     }
+
+    public function testGetOrNullReturnsServiceWhenRegistered(): void
+    {
+        $expected = new Foo();
+        $container = new class($expected) implements ContainerInterface {
+            public function __construct(private object $service) {}
+
+            public function get(string $id): object
+            {
+                return $this->service;
+            }
+
+            public function has(string $id): bool
+            {
+                return true;
+            }
+        };
+
+        $this->assertSame($expected, ContainerDependency::getOrNull($container, FooInterface::class));
+    }
+
+    public function testGetOrNullReturnsNullWhenHasIsFalse(): void
+    {
+        $container = new class implements ContainerInterface {
+            public function get(string $id): never
+            {
+                throw new class('Not found') extends Exception implements NotFoundExceptionInterface {};
+            }
+
+            public function has(string $id): bool
+            {
+                return false;
+            }
+        };
+
+        $this->assertNull(ContainerDependency::getOrNull($container, FooInterface::class));
+    }
+
+    public function testGetOrNullReturnsNullWhenHasIsTrueButGetNotFound(): void
+    {
+        $container = new class implements ContainerInterface {
+            public function get(string $id): never
+            {
+                throw new class('Not found') extends Exception implements NotFoundExceptionInterface {};
+            }
+
+            public function has(string $id): bool
+            {
+                return true;
+            }
+        };
+
+        $this->assertNull(ContainerDependency::getOrNull($container, FooInterface::class));
+    }
+
+    public function testGetOrNullThrowsWhenContainerReturnsUnexpectedType(): void
+    {
+        $container = new class implements ContainerInterface {
+            public function get(string $id): object
+            {
+                return new stdClass();
+            }
+
+            public function has(string $id): bool
+            {
+                return true;
+            }
+        };
+
+        $this->expectException(ContainerDependencyException::class);
+        $this->expectExceptionMessage(
+            'Container service (Tests\Unit\Container\FooInterface) must be an instance of Tests\Unit\Container\FooInterface, stdClass given.',
+        );
+
+        ContainerDependency::getOrNull($container, FooInterface::class);
+    }
 }
 
 interface FooInterface {}

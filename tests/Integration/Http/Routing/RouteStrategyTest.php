@@ -7,6 +7,7 @@ use Concept\Core\Events\Http\RouteInterceptorInvoked;
 use Concept\Core\Http\Contracts\RouteInterceptorInterface;
 use Concept\Core\Http\Contracts\RequestContextInterface;
 use Concept\Core\Http\Request\RequestContext;
+use Concept\Core\Http\Routing\Exception\UnresolvedArgumentException;
 use Concept\Core\Http\Routing\Resolvers\RouteParameterArgumentResolver;
 use Concept\Core\Http\Routing\Resolvers\ServerRequestArgumentResolver;
 use Concept\Core\Http\Routing\RouteStrategy;
@@ -84,6 +85,50 @@ final class RouteStrategyTest extends TestCase
         );
 
         $router->dispatch($this->request('GET', '/broken'));
+    }
+
+    public function testUnresolvedRequiredParameterThrowsBeforeHandler(): void
+    {
+        $router = $this->createRouter();
+
+        $router->get('/broken', static function (stdClass $missing): ResponseInterface {
+            return new Response\EmptyResponse();
+        });
+
+        $this->expectException(UnresolvedArgumentException::class);
+        $this->expectExceptionMessage(
+            'Cannot resolve parameter $missing of type stdClass: no ArgumentResolver supported it.',
+        );
+
+        $router->dispatch($this->request('GET', '/broken'));
+    }
+
+    public function testUnresolvedNullableParameterReceivesNull(): void
+    {
+        $router = $this->createRouter();
+
+        $router->get('/ok', function (?stdClass $missing): ResponseInterface {
+            $this->assertNull($missing);
+
+            return new Response\TextResponse('ok');
+        });
+
+        $response = $router->dispatch($this->request('GET', '/ok'));
+
+        $this->assertSame('ok', (string) $response->getBody());
+    }
+
+    public function testUnresolvedParameterWithDefaultUsesDefault(): void
+    {
+        $router = $this->createRouter();
+
+        $router->get('/ok', static function (string $name = 'guest'): ResponseInterface {
+            return new Response\TextResponse($name);
+        });
+
+        $response = $router->dispatch($this->request('GET', '/ok'));
+
+        $this->assertSame('guest', (string) $response->getBody());
     }
 
     public function testInterceptorRunsBeforeRouteHandler(): void

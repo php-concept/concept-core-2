@@ -19,8 +19,10 @@ final class ContainerDependency
     {
         try {
             $resolved = $container->get($interface);
-        } catch (NotFoundExceptionInterface | LeagueNotFoundException | ContainerExceptionInterface $exception) {
+        } catch (NotFoundExceptionInterface | LeagueNotFoundException $exception) {
             throw ContainerDependencyException::notRegistered($interface, $exception);
+        } catch (ContainerExceptionInterface $exception) {
+            throw ContainerDependencyException::resolutionFailed($interface, $exception);
         }
 
         if (!$resolved instanceof $interface) {
@@ -33,7 +35,7 @@ final class ContainerDependency
 
     /**
      * Optional resolve: missing registration → null.
-     * Wrong type still throws (does not hide broken bindings).
+     * Resolution / type failures still throw (does not hide broken bindings).
      *
      * @template T of object
      * @param class-string<T> $interface
@@ -45,14 +47,6 @@ final class ContainerDependency
             return null;
         }
 
-        try {
-            return self::get($container, $interface);
-        } catch (ContainerDependencyException $exception) {
-            if ($exception->isNotRegistered()) {
-                return null;
-            }
-
-            throw $exception;
-        }
+        return self::get($container, $interface);
     }
 }

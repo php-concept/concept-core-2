@@ -8,6 +8,7 @@ use Concept\Core\Events\Http\RouteInterceptorInvoked;
 use Concept\Core\Http\Contracts\ArgumentResolverInterface;
 use Concept\Core\Http\Contracts\RequestContextInterface;
 use Concept\Core\Http\Contracts\RouteInterceptorInterface;
+use Concept\Core\Http\Routing\Exception\UnresolvedArgumentException;
 use League\Route\Http\Exception\NotFoundException;
 use League\Route\Route;
 use Psr\EventDispatcher\EventDispatcherInterface;
@@ -232,7 +233,11 @@ class RouteStrategy extends ApplicationStrategy
             return $parameter->getDefaultValue();
         }
 
-        return null;
+        if ($parameter->allowsNull()) {
+            return null;
+        }
+
+        throw UnresolvedArgumentException::forParameter($parameter);
     }
 
     private function assertResponse(mixed $result): ResponseInterface

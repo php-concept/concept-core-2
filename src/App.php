@@ -2,22 +2,20 @@
 
 namespace Concept\Core;
 
-use Concept\Core\Events\Http\RequestHandled;
+use Concept\Core\Http\HttpRunner;
 use InvalidArgumentException;
 use League\Container\Container;
 use League\Container\ReflectionContainer;
 use League\Container\ServiceProvider\ServiceProviderInterface;
-use League\Route\Router;
 use Psr\Container\ContainerInterface;
-use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use RuntimeException;
 
 final class App
 {
-    private const string ERR_ROUTER_AND_REQUEST_NOT_REGISTERED =
-        'RouterInterface and ServerRequestInterface must be registered before running the application.';
+    private const string ERR_RUNNER_AND_REQUEST_NOT_REGISTERED =
+        'HttpRunner and ServerRequestInterface must be registered before running the application.';
     private const string ERR_IS_NOT_PROVIDER_INSTANCE =
         'Item #%s in providers list should implements ServiceProviderInterface';
 
@@ -62,36 +60,15 @@ final class App
 
     public function handle(): ResponseInterface
     {
-        if (!$this->container->has(Router::class) || !$this->container->has(ServerRequestInterface::class)) {
-            throw new RuntimeException(self::ERR_ROUTER_AND_REQUEST_NOT_REGISTERED);
+        if (!$this->container->has(HttpRunner::class) || !$this->container->has(ServerRequestInterface::class)) {
+            throw new RuntimeException(self::ERR_RUNNER_AND_REQUEST_NOT_REGISTERED);
         }
 
-        /** @var Router $router */
-        $router = $this->container->get(Router::class);
+        /** @var HttpRunner $runner */
+        $runner = $this->container->get(HttpRunner::class);
         /** @var ServerRequestInterface $request */
         $request = $this->container->get(ServerRequestInterface::class);
 
-        $dispatcher = $this->container->has(EventDispatcherInterface::class)
-            ? $this->container->get(EventDispatcherInterface::class)
-            : null;
-
-        $startedAt = microtime(true);
-        $memoryStart = memory_get_usage(true);
-
-        try {
-            return $router->dispatch($request);
-        } finally {
-            if ($dispatcher instanceof EventDispatcherInterface) {
-                $dispatcher->dispatch(new RequestHandled(
-                    method: $request->getMethod(),
-                    path: $request->getUri()->getPath(),
-                    memoryStart: $memoryStart,
-                    memoryEnd: memory_get_usage(true),
-                    memoryPeak: memory_get_peak_usage(true),
-                    startedAt: $startedAt,
-                    duration: microtime(true) - $startedAt,
-                ));
-            }
-        }
+        return $runner->handle($request);
     }
 }

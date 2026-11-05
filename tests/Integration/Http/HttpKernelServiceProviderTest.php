@@ -3,6 +3,7 @@
 namespace Tests\Integration\Http;
 
 use Concept\Core\Http\Contracts\RequestContextInterface;
+use Concept\Core\Http\HttpRunner;
 use Concept\Core\Http\Routing\Resolvers\RouteParameterArgumentResolver;
 use Concept\Core\Http\Routing\Resolvers\ServerRequestArgumentResolver;
 use Concept\Core\Providers\Http\HttpKernelServiceProvider;
@@ -59,7 +60,9 @@ final class HttpKernelServiceProviderTest extends TestCase
         $provider = new HttpKernelServiceProvider([]);
 
         $this->assertTrue($provider->provides(ServerRequestInterface::class));
+        $this->assertTrue($provider->provides(RequestContextInterface::class));
         $this->assertTrue($provider->provides(Router::class));
+        $this->assertTrue($provider->provides(HttpRunner::class));
     }
 
     /**

@@ -22,6 +22,7 @@ Skeleton підключає цей проєкт через symlink:
 | Компонент | Файл |
 |-----------|------|
 | Application | `src/App.php` |
+| HTTP runner | `src/Http/HttpRunner.php` |
 | HTTP kernel provider | `src/Providers/Http/HttpKernelServiceProvider.php` |
 | Route strategy | `src/Http/Routing/RouteStrategy.php` |
 | Resolver contract | `src/Http/Contracts/ArgumentResolverInterface.php` |
@@ -48,7 +49,7 @@ Config extension (пізніше) читатиме конфіги і проки�
 
 `RouteStrategy::prepareRequest()` додає route vars у PSR-7 attributes і повертає enriched request для resolvers/handler.
 
-**Не робить** `container->add(ServerRequestInterface, …)`. Container request (globals) — тільки entry point у `App::handle()`.
+**Не робить** `container->add(ServerRequestInterface, …)`. Container request (globals) — entry point у `App::handle()` → `HttpRunner::run()`.
 
 Extensions отримують request явно (resolver args, method params). `RequestProxy` — не в core; у Http extension лише за потреби.
 

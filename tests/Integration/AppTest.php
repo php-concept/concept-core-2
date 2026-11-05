@@ -4,6 +4,7 @@ namespace Tests\Integration;
 
 use Concept\Core\App;
 use Concept\Core\Events\Http\RequestHandled;
+use Concept\Core\Http\HttpRunner;
 use Concept\Core\Http\Routing\Resolvers\RouteParameterArgumentResolver;
 use Concept\Core\Http\Routing\Resolvers\ServerRequestArgumentResolver;
 use Concept\Core\Providers\Http\HttpKernelServiceProvider;
@@ -27,7 +28,7 @@ final class AppTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'RouterInterface and ServerRequestInterface must be registered before running the application.',
+            'HttpRunner and ServerRequestInterface must be registered before running the application.',
         );
 
         $app->handle();
@@ -37,7 +38,10 @@ final class AppTest extends TestCase
     {
         $app = App::create();
         $container = $app->getContainer();
-        $container->add(Router::class, fn(): Router => new Router())->setShared(true);
+        $container->add(
+            HttpRunner::class,
+            fn(): HttpRunner => new HttpRunner(new Router()),
+        )->setShared(true);
 
         $this->expectException(RuntimeException::class);
 

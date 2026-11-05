@@ -5,6 +5,7 @@ namespace Concept\Core\Providers\Http;
 use Concept\Core\Http\Contracts\ArgumentResolverInterface;
 use Concept\Core\Http\Contracts\RequestContextInterface;
 use Concept\Core\Http\Contracts\RouteInterceptorInterface;
+use Concept\Core\Http\HttpRunner;
 use Concept\Core\Http\Request\RequestContext;
 use Concept\Core\Http\Routing\RouteStrategy;
 use Closure;
@@ -40,6 +41,7 @@ class HttpKernelServiceProvider extends AbstractServiceProvider
             ServerRequestInterface::class,
             RequestContextInterface::class,
             Router::class,
+            HttpRunner::class,
         ];
 
         return in_array($id, $services);
@@ -73,6 +75,22 @@ class HttpKernelServiceProvider extends AbstractServiceProvider
             $this->registerRoutes($router, $this->routePaths);
 
             return $router;
+        })->setShared(true);
+
+        $container->add(HttpRunner::class, function() use ($container) {
+            $router = $container->get(Router::class);
+            if (!$router instanceof Router) {
+                throw new InvalidArgumentException('Router service must resolve to ' . Router::class);
+            }
+
+            $dispatcher = $container->has(EventDispatcherInterface::class)
+                ? $container->get(EventDispatcherInterface::class)
+                : null;
+
+            return new HttpRunner(
+                $router,
+                $dispatcher instanceof EventDispatcherInterface ? $dispatcher : null,
+            );
         })->setShared(true);
     }
 

@@ -19,15 +19,14 @@ final class App
     private const string ERR_IS_NOT_PROVIDER_INSTANCE =
         'Item #%s in providers list should implements ServiceProviderInterface';
 
-    protected Container $container;
+    private Container $container;
 
     private function __construct()
     {
         $this->container = new Container();
         $this->container->delegate(new ReflectionContainer(cacheResolutions: true));
-        $this->container->add(ContainerInterface::class, fn() => $this->container)
-            ->setShared(true);
-        $this->container->add(App::class, fn() => $this);
+        $this->container->add(ContainerInterface::class, $this->container)->setShared(true);
+        $this->container->add(App::class, $this)->setShared(true);
     }
 
     public static function create(): App

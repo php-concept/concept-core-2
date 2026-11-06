@@ -3,6 +3,7 @@
 namespace Concept\Core\Http\Routing;
 
 use Closure;
+use Concept\Core\Container\ContainerDependency;
 use Concept\Core\Events\Http\RouteHandlerInvoked;
 use Concept\Core\Events\Http\RouteInterceptorInvoked;
 use Concept\Core\Http\Contracts\ArgumentResolverInterface;
@@ -113,21 +114,17 @@ class RouteStrategy extends ApplicationStrategy
             return $this->assertResponse($reflection->invokeArgs($arguments));
         } finally {
             $this->dispatchRouteHandlerInvoked($callable, $route, $startedAt);
-            $requestContext?->reset();
         }
     }
 
     private function resolveRequestContext(): ?RequestContextInterface
     {
-        /** @var ContainerInterface $container */
         $container = $this->getContainer();
-        if (!$container->has(RequestContextInterface::class)) {
+        if (!$container instanceof ContainerInterface) {
             return null;
         }
 
-        $requestContext = $container->get(RequestContextInterface::class);
-
-        return $requestContext instanceof RequestContextInterface ? $requestContext : null;
+        return ContainerDependency::getOrNull($container, RequestContextInterface::class);
     }
 
     private function runInterceptors(Route $route, ServerRequestInterface $request): void

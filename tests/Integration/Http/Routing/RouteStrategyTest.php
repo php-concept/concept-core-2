@@ -54,7 +54,7 @@ final class RouteStrategyTest extends TestCase
         $this->assertSame('42', (string) $response->getBody());
     }
 
-    public function testRequestContextReceivesEnrichedRequestAndResetsAfterHandler(): void
+    public function testRequestContextReceivesEnrichedRequestAndIsNotResetByStrategy(): void
     {
         $requestContext = new RequestContext();
         $router = $this->createRouter($requestContext);
@@ -68,7 +68,7 @@ final class RouteStrategyTest extends TestCase
 
         $router->dispatch($this->request('GET', '/users/42'));
 
-        $this->assertNull($requestContext->current());
+        $this->assertSame('42', $requestContext->current()?->getAttribute('id'));
     }
 
     public function testHandlerMustReturnResponseInterface(): void

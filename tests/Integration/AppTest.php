@@ -3,8 +3,9 @@
 namespace Tests\Integration;
 
 use Concept\Core\App;
+use Concept\Core\Container\ContainerDependency;
 use Concept\Core\Events\Http\RequestHandled;
-use Concept\Core\Http\HttpRunner;
+use Concept\Core\Http\Contracts\RequestContextInterface;
 use Concept\Core\Http\Routing\Resolvers\RouteParameterArgumentResolver;
 use Concept\Core\Http\Routing\Resolvers\ServerRequestArgumentResolver;
 use Concept\Core\Providers\Http\HttpKernelServiceProvider;
@@ -12,10 +13,8 @@ use InvalidArgumentException;
 use Laminas\Diactoros\ServerRequest;
 use Laminas\Diactoros\Uri;
 use League\Container\ServiceProvider\AbstractServiceProvider;
-use League\Route\Router;
 use PHPUnit\Framework\TestCase;
 use Psr\EventDispatcher\EventDispatcherInterface;
-use Psr\Http\Message\ServerRequestInterface;
 use RuntimeException;
 use stdClass;
 use Tests\Support\RecordingEventDispatcher;
@@ -28,24 +27,10 @@ final class AppTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(
-            'HttpRunner and ServerRequestInterface must be registered before running the application.',
+            'HTTP kernel must be registered before running the application.',
         );
 
-        $app->handle();
-    }
-
-    public function testHandleThrowsWhenRequestIsNotRegistered(): void
-    {
-        $app = App::create();
-        $container = $app->getContainer();
-        $container->add(
-            HttpRunner::class,
-            fn(): HttpRunner => new HttpRunner(new Router()),
-        )->setShared(true);
-
-        $this->expectException(RuntimeException::class);
-
-        $app->handle();
+        $app->handle($this->createRequest('GET', '/ping'));
     }
 
     public function testHandleDispatchesRegisteredRouterAndReturnsResponse(): void
@@ -59,15 +44,32 @@ final class AppTest extends TestCase
             ]),
         ]);
 
-        $app->getContainer()->add(
-            ServerRequestInterface::class,
-            fn(): ServerRequest => $this->createRequest('GET', '/ping'),
-        )->setShared(true);
-
-        $response = $app->handle();
+        $response = $app->handle($this->createRequest('GET', '/ping'));
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame('pong', (string) $response->getBody());
+    }
+
+    public function testRequestFromGlobalsReplacesPreviousRequestInContext(): void
+    {
+        $routesFile = $this->createRoutesFile();
+        $app = App::create();
+        $app->registerServiceProviders([
+            new HttpKernelServiceProvider($routesFile, [
+                new RouteParameterArgumentResolver(),
+                new ServerRequestArgumentResolver(),
+            ]),
+        ]);
+
+        $context = ContainerDependency::get($app->getContainer(), RequestContextInterface::class);
+
+        $first = $app->requestFromGlobals(['REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/first']);
+        $this->assertSame($first, $context->current());
+        $this->assertSame('/first', $context->current()?->getUri()->getPath());
+
+        $second = $app->requestFromGlobals(['REQUEST_METHOD' => 'POST', 'REQUEST_URI' => '/second']);
+        $this->assertSame($second, $context->current());
+        $this->assertSame('/second', $context->current()?->getUri()->getPath());
     }
 
     public function testHandleDispatchesRequestHandledEventWhenDispatcherIsRegistered(): void
@@ -86,12 +88,7 @@ final class AppTest extends TestCase
             ]),
         ]);
 
-        $container->add(
-            ServerRequestInterface::class,
-            fn(): ServerRequest => $this->createRequest('GET', '/ping'),
-        )->setShared(true);
-
-        $app->handle();
+        $app->handle($this->createRequest('GET', '/ping'));
 
         $requestHandledEvents = array_values(array_filter(
             $dispatcher->events,
@@ -131,7 +128,7 @@ final class AppTest extends TestCase
         $app = App::create();
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Item #0 in providers list should implements ServiceProviderInterface');
+        $this->expectExceptionMessage('Item #0 in providers list should implement ServiceProviderInterface');
 
         $app->registerServiceProviders([new stdClass()]);
     }

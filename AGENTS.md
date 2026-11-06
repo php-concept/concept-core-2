@@ -45,13 +45,20 @@ Skeleton підключає цей проєкт через symlink:
 
 Config extension (пізніше) читатиме конфіги і прокидатиме значення в glue — ядро лишається без Config.
 
+## RequestContext lifetime
+
+- `App::requestFromGlobals` — FPM/FrankenPHP entry: `fromGlobals` + `reset`/`set` RequestContext.
+- `HttpRunner::handle` — `set($request)` на вході; `reset()` **лише після успішного** dispatch (fail лишає context для Whoops). RoadRunner може передати готовий PSR-7 прямо в `handle`.
+- `RouteStrategy` — оновлює context на enriched request перед handler; **не** скидає.
+- Whoops `RenderHttpErrorHandler` — читає `RequestContext::current()`; наступний `requestFromGlobals` / `handle` затирає context.
+
 ## Enriched request — без container refresh
 
 `RouteStrategy::prepareRequest()` додає route vars у PSR-7 attributes і повертає enriched request для resolvers/handler.
 
-**Не робить** `container->add(ServerRequestInterface, …)`. Container request (globals) — entry point у `App::handle()` → `HttpRunner::run()`.
+Entrypoint: `$app->requestFromGlobals(...)` → `$app->handle($request)`. У контейнері `ServerRequestInterface` **не** реєструється.
 
-Extensions отримують request явно (resolver args, method params). `RequestProxy` — не в core; у Http extension лише за потреби.
+Extensions отримують request явно (resolver args, method params) або через `RequestContext` під час HTTP lifecycle.
 
 ## Argument resolvers — core (implemented)
 

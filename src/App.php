@@ -2,8 +2,11 @@
 
 namespace Concept\Core;
 
+use Concept\Core\Container\ContainerDependency;
+use Concept\Core\Http\Contracts\RequestContextInterface;
 use Concept\Core\Http\HttpRunner;
 use InvalidArgumentException;
+use Laminas\Diactoros\ServerRequestFactory;
 use League\Container\Container;
 use League\Container\ReflectionContainer;
 use League\Container\ServiceProvider\ServiceProviderInterface;
@@ -14,17 +17,17 @@ use RuntimeException;
 
 final class App
 {
-    private const string ERR_RUNNER_AND_REQUEST_NOT_REGISTERED =
-        'HttpRunner and ServerRequestInterface must be registered before running the application.';
+    private const string ERR_HTTP_KERNEL_NOT_REGISTERED =
+        'HTTP kernel must be registered before running the application.';
     private const string ERR_IS_NOT_PROVIDER_INSTANCE =
-        'Item #%s in providers list should implements ServiceProviderInterface';
+        'Item #%s in providers list should implement ServiceProviderInterface';
 
     private Container $container;
 
     private function __construct()
     {
         $this->container = new Container();
-        $this->container->delegate(new ReflectionContainer(cacheResolutions: true));
+        $this->container->delegate(new ReflectionContainer(cacheResolutions: false));
         $this->container->add(ContainerInterface::class, $this->container)->setShared(true);
         $this->container->add(App::class, $this)->setShared(true);
     }
@@ -57,17 +60,44 @@ final class App
         }
     }
 
-    public function handle(): ResponseInterface
+    /**
+     * Builds a request from SAPI globals, clears any previous RequestContext, and stores the new one.
+     *
+     * @param array<string, mixed>|null $server
+     * @param array<string, mixed>|null $query
+     * @param array<string, mixed>|null $body
+     * @param array<string, mixed>|null $cookies
+     * @param array<string, mixed>|null $files
+     */
+    public function requestFromGlobals(
+        ?array $server = null,
+        ?array $query = null,
+        ?array $body = null,
+        ?array $cookies = null,
+        ?array $files = null,
+    ): ServerRequestInterface {
+        $request = ServerRequestFactory::fromGlobals(
+            $server ?? $_SERVER,
+            $query ?? $_GET,
+            $body ?? $_POST,
+            $cookies ?? $_COOKIE,
+            $files ?? $_FILES,
+        );
+
+        $context = ContainerDependency::getOrNull($this->container, RequestContextInterface::class);
+        $context?->reset();
+        $context?->set($request);
+
+        return $request;
+    }
+
+    public function handle(ServerRequestInterface $request): ResponseInterface
     {
-        if (!$this->container->has(HttpRunner::class) || !$this->container->has(ServerRequestInterface::class)) {
-            throw new RuntimeException(self::ERR_RUNNER_AND_REQUEST_NOT_REGISTERED);
+        // Interfaces are not auto-wired by ReflectionContainer; this signals HttpKernelServiceProvider.
+        if (!$this->container->has(RequestContextInterface::class)) {
+            throw new RuntimeException(self::ERR_HTTP_KERNEL_NOT_REGISTERED);
         }
 
-        /** @var HttpRunner $runner */
-        $runner = $this->container->get(HttpRunner::class);
-        /** @var ServerRequestInterface $request */
-        $request = $this->container->get(ServerRequestInterface::class);
-
-        return $runner->handle($request);
+        return ContainerDependency::get($this->container, HttpRunner::class)->handle($request);
     }
 }

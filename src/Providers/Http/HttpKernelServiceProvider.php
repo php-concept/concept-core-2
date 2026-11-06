@@ -2,6 +2,7 @@
 
 namespace Concept\Core\Providers\Http;
 
+use Concept\Core\Container\ContainerDependency;
 use Concept\Core\Http\Contracts\ArgumentResolverInterface;
 use Concept\Core\Http\Contracts\RequestContextInterface;
 use Concept\Core\Http\Contracts\RouteInterceptorInterface;
@@ -10,12 +11,10 @@ use Concept\Core\Http\Request\RequestContext;
 use Concept\Core\Http\Routing\RouteStrategy;
 use Closure;
 use InvalidArgumentException;
-use Laminas\Diactoros\ServerRequestFactory;
 use League\Container\ServiceProvider\AbstractServiceProvider;
 use League\Route\Router;
 use Psr\Container\ContainerInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
-use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
 
 class HttpKernelServiceProvider extends AbstractServiceProvider
@@ -38,7 +37,6 @@ class HttpKernelServiceProvider extends AbstractServiceProvider
     public function provides(string $id): bool
     {
         $services = [
-            ServerRequestInterface::class,
             RequestContextInterface::class,
             Router::class,
             HttpRunner::class,
@@ -51,23 +49,15 @@ class HttpKernelServiceProvider extends AbstractServiceProvider
     {
         $container = $this->getContainer();
 
-        $container->add(ServerRequestInterface::class, function() {
-            return ServerRequestFactory::fromGlobals($_SERVER, $_GET, $_POST, $_COOKIE, $_FILES);
-        })->setShared(true);
-
         $container->add(RequestContextInterface::class, fn() => new RequestContext())->setShared(true);
 
         $container->add(Router::class, function() use ($container) {
             $router = new Router();
 
-            $dispatcher = $container->has(EventDispatcherInterface::class)
-                ? $container->get(EventDispatcherInterface::class)
-                : null;
-
             $strategy = new RouteStrategy(
                 $this->resolvers,
                 $this->interceptors,
-                $dispatcher instanceof EventDispatcherInterface ? $dispatcher : null,
+                ContainerDependency::getOrNull($container, EventDispatcherInterface::class),
                 $this->notFoundMiddleware,
             );
             $strategy->setContainer($container);
@@ -78,18 +68,10 @@ class HttpKernelServiceProvider extends AbstractServiceProvider
         })->setShared(true);
 
         $container->add(HttpRunner::class, function() use ($container) {
-            $router = $container->get(Router::class);
-            if (!$router instanceof Router) {
-                throw new InvalidArgumentException('Router service must resolve to ' . Router::class);
-            }
-
-            $dispatcher = $container->has(EventDispatcherInterface::class)
-                ? $container->get(EventDispatcherInterface::class)
-                : null;
-
             return new HttpRunner(
-                $router,
-                $dispatcher instanceof EventDispatcherInterface ? $dispatcher : null,
+                ContainerDependency::get($container, Router::class),
+                ContainerDependency::getOrNull($container, EventDispatcherInterface::class),
+                ContainerDependency::getOrNull($container, RequestContextInterface::class),
             );
         })->setShared(true);
     }

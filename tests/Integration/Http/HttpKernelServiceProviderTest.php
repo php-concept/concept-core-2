@@ -59,7 +59,7 @@ final class HttpKernelServiceProviderTest extends TestCase
     {
         $provider = new HttpKernelServiceProvider([]);
 
-        $this->assertTrue($provider->provides(ServerRequestInterface::class));
+        $this->assertFalse($provider->provides(ServerRequestInterface::class));
         $this->assertTrue($provider->provides(RequestContextInterface::class));
         $this->assertTrue($provider->provides(Router::class));
         $this->assertTrue($provider->provides(HttpRunner::class));

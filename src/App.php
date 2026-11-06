@@ -63,11 +63,11 @@ final class App
     /**
      * Builds a request from SAPI globals, clears any previous RequestContext, and stores the new one.
      *
-     * @param array<string, mixed>|null $server
-     * @param array<string, mixed>|null $query
-     * @param array<string, mixed>|null $body
-     * @param array<string, mixed>|null $cookies
-     * @param array<string, mixed>|null $files
+     * @param array<mixed>|null $server
+     * @param array<mixed>|null $query
+     * @param array<mixed>|null $body
+     * @param array<mixed>|null $cookies
+     * @param array<mixed>|null $files
      */
     public function requestFromGlobals(
         ?array $server = null,
